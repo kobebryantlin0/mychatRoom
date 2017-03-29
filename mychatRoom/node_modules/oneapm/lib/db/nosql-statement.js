@@ -1,0 +1,41 @@
+'use strict';
+
+var path = require('path')
+  , DS   = require(path.join(__dirname, '..', 'metrics', 'names')).DATASTORE
+  ;
+
+function ParsedStatement(type, operation, model) {
+  this.type      = type;
+  this.operation = operation;
+  this.model     = model;
+}
+
+ParsedStatement.prototype.recordMetrics = function recordMetrics(segment, scope) {
+  var duration    = segment.getDurationInMillis()
+    , exclusive   = segment.getExclusiveDurationInMillis()
+    , transaction = segment.trace.transaction
+    , type        = transaction.isWeb() ? DS.WEB : DS.OTHER
+    , operation   = DS.OPERATION + '/' + this.type + '/' + this.operation
+    , model       = DS.STATEMENT + '/' + this.type +
+                      '/' + this.model + '/' + this.operation
+    ;
+
+
+  if (scope) transaction.measure(model, scope, duration, exclusive);
+
+  transaction.measure(model,     null, duration, exclusive);
+  transaction.measure(operation, null, duration, exclusive);
+  transaction.measure(type,      null, duration, exclusive);
+  transaction.measure(DS.ALL,    null, duration, exclusive);
+
+  if (segment.port > 0) {
+    var hostname = segment.host || 'localhost'
+      , location = hostname + ':' + segment.port
+      , instance = DS.INSTANCE + '/' + this.type + '/' + location
+      ;
+
+    transaction.measure(instance, null, duration, exclusive);
+  }
+};
+
+module.exports = ParsedStatement;
